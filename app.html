@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MA Sanctuary Management System</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #27ae60;
+            --danger: #c0392b;
+            --light: #ecf0f1;
+            --dark: #34495e;
+        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--light); }
+        header { background: var(--primary); color: white; padding: 1rem; text-align: center; }
+        .container { padding: 20px; max-width: 600px; margin: auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #219150; }
+        .hidden { display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: var(--light); }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>MA SANCTUARY</h1>
+    <p>Staff Management & Attendance System</p>
+</header>
+
+<div class="container">
+    <!-- Login Section -->
+    <div id="login-screen">
+        <h2>Login</h2>
+        <div class="form-group">
+            <label for="loginRole">Select Role:</label>
+            <select id="loginRole">
+                <option value="Staff">Staff</option>
+                <option value="Admin">Admin</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="loginPin">Passcode (PIN):</label>
+            <input type="password" id="loginPin" placeholder="Enter PIN">
+        </div>
+        <button onclick="handleLogin()">Login</button>
+    </div>
+
+    <!-- App Dashboard -->
+    <div id="app-screen" class="hidden">
+        <h2 id="welcome-message">Dashboard</h2>
+        <button style="background: var(--danger); margin-bottom: 20px;" onclick="handleLogout()">Logout</button>
+        
+        <div id="admin-controls" class="hidden">
+            <h3>Admin Actions</h3>
+            <div class="form-group">
+                <input type="text" id="newStaffName" placeholder="Staff Name">
+            </div>
+            <button onclick="addStaff()">Add Staff</button>
+        </div>
+
+        <h3>Attendance</h3>
+        <div class="form-group">
+            <label for="staffSelect">Select Staff:</label>
+            <select id="staffSelect"></select>
+        </div>
+        <button onclick="markAttendance()">Mark Present</button>
+
+        <h3>Attendance Records</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="attendance-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Initial Data Setup
+    let staffList = JSON.parse(localStorage.getItem('ma_staff')) || [
+        { id: 1, name: "Vasudev", pin: "1234" },
+        { id: 2, name: "Dakshin", pin: "5678" }
+    ];
+    let attendanceList = JSON.parse(localStorage.getItem('ma_attendance')) || [];
+    let currentUser = null;
+
+    function saveDatastore() {
+        localStorage.setItem('ma_staff', JSON.stringify(staffList));
+        localStorage.setItem('ma_attendance', JSON.stringify(attendanceList));
+    }
+
+    function handleLogin() {
+        const role = document.getElementById('loginRole').value;
+        const pin = document.getElementById('loginPin').value;
+
+        if (role === "Admin") {
+            if (pin === "0000") { // Default admin PIN
+                currentUser = { name: "Admin", role: "Admin" };
+                showApp();
+            } else {
+                alert("Invalid Admin PIN!");
+            }
+        } else {
+            const user = staffList.find(s => s.pin === pin);
+            if (user) {
+                currentUser = { ...user, role: "Staff" };
+                showApp();
+            } else {
+                alert("Invalid Staff PIN!");
+            }
+        }
+    }
+
+    function showApp() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('app-screen').classList.remove('hidden');
+        document.getElementById('welcome-message').innerText = `Welcome, ${currentUser.name} (${currentUser.role})`;
+
+        if (currentUser.role === "Admin") {
+            document.getElementById('admin-controls').classList.remove('hidden');
+        } else {
+            document.getElementById('admin-controls').classList.add('hidden');
+        }
+
+        populateStaffDropdown();
+        renderAttendance();
+    }
+
+    function handleLogout() {
+        currentUser = null;
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('app-screen').classList.add('hidden');
+        document.getElementById('loginPin').value = '';
+    }
+
+    function populateStaffDropdown() {
+        const select = document.getElementById('staffSelect');
+        select.innerHTML = '';
+        staffList.forEach(staff => {
+            let opt = document.createElement('option');
+            opt.value = staff.id;
+            opt.innerHTML = staff.name;
+            select.appendChild(opt);
+        });
+    }
+
+    function addStaff() {
+        const nameInput = document.getElementById('newStaffName');
+        if (nameInput.value.trim() !== "") {
+            const newId = staffList.length > 0 ? Math.max(...staffList.map(s => s.id)) + 1 : 1;
+            const newPin = Math.floor(1000 + Math.random() * 9000).toString(); // Generate 4 digit pin
+            staffList.push({ id: newId, name: nameInput.value, pin: newPin });
+            saveDatastore();
+            nameInput.value = '';
+            populateStaffDropdown();
+            alert(`Staff added! Generated PIN: ${newPin}`);
+        } else {
+            alert("Enter a name.");
+        }
+    }
+
+    function markAttendance() {
+        const staffId = parseInt(document.getElementById('staffSelect').value);
+        const staff = staffList.find(s => s.id === staffId);
+        const today = new Date().toLocaleDateString();
+
+        if (staff) {
+            const exists = attendanceList.some(a => a.staffId === staffId && a.date === today);
+            if (!exists) {
+                attendanceList.push({ staffId: staff.id, name: staff.name, date: today, status: "Present" });
+                saveDatastore();
+                renderAttendance();
+            } else {
+                alert("Attendance already marked for today.");
+            }
+        }
+    }
+
+    function renderAttendance() {
+        const tbody = document.getElementById('attendance-body');
+        tbody.innerHTML = '';
+        attendanceList.forEach(record => {
+            let row = `<tr>
+                <td>${record.name}</td>
+                <td>${record.date}</td>
+                <td>${record.status}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+</script>
+
+</body>
+</html>
